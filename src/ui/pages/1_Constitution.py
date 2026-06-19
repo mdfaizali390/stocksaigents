@@ -18,7 +18,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sys
 from datetime import datetime, timezone
+from pathlib import Path
+
+# Repo root onto sys.path so `from src.…` resolves on Streamlit Cloud.
+# This file is at <repo>/src/ui/pages/1_Constitution.py → root is parents[3].
+_REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import streamlit as st
 

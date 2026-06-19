@@ -19,8 +19,19 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import sys
 import traceback
 from datetime import datetime, timezone
+from pathlib import Path
+
+# Ensure the repo root is importable so `from src.…` works regardless of
+# how the app is launched. Streamlit Cloud runs `streamlit run
+# src/ui/streamlit_app.py` from the repo root but does NOT add it to
+# sys.path — without this, `import src` fails with ModuleNotFoundError.
+# This file is at <repo>/src/ui/streamlit_app.py, so root is parents[2].
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
 
 import streamlit as st
 
