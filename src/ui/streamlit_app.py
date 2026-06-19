@@ -43,10 +43,70 @@ logging.basicConfig(
 )
 
 from src.constitution.loader import load_constitution
-from src.data.brokerage.robinhood_mcp import RobinhoodMCPClient
+from src.data.brokerage.robinhood_mcp import InMemoryTokenStorage, RobinhoodMCPClient
 from src.models import AgentReport, Decision
 from src.privacy import redact_shares
 from src.orchestrator import Orchestrator
+
+
+# ─── secrets bridge (Streamlit Cloud) ─────────────────────────────────
+# config.py reads API keys from environment variables (via pydantic-settings).
+# On Streamlit Cloud, keys live in st.secrets, NOT the environment — so copy
+# them across before anything reads Settings. Safe/no-op locally where the
+# .env file already populates the environment.
+import os  # noqa: E402
+
+
+def _secret(key: str, default=None):
+    """Read from st.secrets, tolerating the no-secrets-file case (local)."""
+    try:
+        return st.secrets.get(key, default)
+    except Exception:  # noqa: BLE001 — no secrets.toml locally → FileNotFoundError
+        return default
+
+
+for _k in ("ANTHROPIC_API_KEY", "FINNHUB_API_KEY"):
+    _v = _secret(_k)
+    if _v and not os.environ.get(_k):
+        os.environ[_k] = str(_v)
+
+
+from pathlib import Path as _Path  # noqa: E402
+
+_LOCAL_TOKENS = _Path(".cache/robinhood_oauth/tokens.json")
+
+
+def _robinhood_mode() -> str:
+    """Decide how (or whether) to use Robinhood.
+
+      "headless"  — cloud with tokens in secrets → use them, no browser
+      "local"     — local cache tokens present → on-disk + browser flow
+      "disabled"  — no tokens anywhere (or DISABLE_ROBINHOOD set) →
+                    run advisor without live portfolio, gracefully
+
+    Set DISABLE_ROBINHOOD = "1" in secrets to force-disable even if tokens
+    exist (useful for a public demo).
+    """
+    if str(_secret("DISABLE_ROBINHOOD", "")).strip() in ("1", "true", "True"):
+        return "disabled"
+    rh = _secret("robinhood", {}) or {}
+    if rh.get("client_info") and rh.get("tokens"):
+        return "headless"
+    if _LOCAL_TOKENS.exists():
+        return "local"
+    return "disabled"
+
+
+def _robinhood_client() -> RobinhoodMCPClient:
+    """Construct a client for the active mode. Only called when the mode
+    is 'headless' or 'local' — never 'disabled'."""
+    rh = _secret("robinhood", {}) or {}
+    if rh.get("client_info") and rh.get("tokens"):
+        return RobinhoodMCPClient(
+            storage=InMemoryTokenStorage(rh["client_info"], rh["tokens"]),
+            headless=True,
+        )
+    return RobinhoodMCPClient()  # local: on-disk cache + browser flow
 
 
 # ─── page config ──────────────────────────────────────────────────────
@@ -99,9 +159,15 @@ def _flatten_exception_group(exc: BaseException) -> list[BaseException]:
 
 
 async def submit_query(query: str, mode: str) -> Decision:
-    """Open Robinhood MCP, run the orchestrator end-to-end, close."""
+    """Run the orchestrator end-to-end. Uses Robinhood when available;
+    otherwise runs without a brokerage (portfolio-dependent agents
+    degrade gracefully)."""
     constitution, _ = load_constitution()
-    async with RobinhoodMCPClient() as rh:
+    if _robinhood_mode() == "disabled":
+        # No live brokerage — orchestrator handles brokerage=None cleanly.
+        orch = Orchestrator(brokerage=None)
+        return await orch.handle_query(query, constitution=constitution, mode=mode)
+    async with _robinhood_client() as rh:
         orch = Orchestrator(brokerage=rh)
         return await orch.handle_query(query, constitution=constitution, mode=mode)
 
@@ -459,6 +525,14 @@ def render_sidebar() -> str:
     st.sidebar.title(APP_NAME)
     st.sidebar.caption(f"{APP_TAGLINE} · advisor only · never auto-trades")
 
+    if _robinhood_mode() == "disabled":
+        st.sidebar.info(
+            "🔌 **Portfolio not connected.** Market & research questions "
+            "work fully. Questions about *your* holdings, cash, or "
+            "trade-specific risk need a Robinhood connection (available "
+            "when running locally)."
+        )
+
     mode = st.sidebar.radio(
         "Mode",
         options=["dry_run", "live"],
@@ -524,7 +598,7 @@ def main() -> None:
     )
 
     query = st.text_input(
-        "",
+        "Your question",
         key="query_input",
         placeholder="e.g. Should I buy NVDA?",
         label_visibility="collapsed",

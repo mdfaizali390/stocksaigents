@@ -84,6 +84,49 @@ class FileTokenStorage(TokenStorage):
         self._tokens_path.write_text(tokens.model_dump_json(indent=2))
 
 
+class InMemoryTokenStorage(TokenStorage):
+    """Token storage seeded from strings (e.g. Streamlit Cloud secrets).
+
+    Used on headless hosts where the browser OAuth flow can't run and the
+    local ``.cache`` directory doesn't persist. You pre-load the
+    ``client_info`` and ``tokens`` JSON captured from a local auth, and the
+    app authenticates with those.
+
+    Writes are kept in memory only — a refreshed access token survives for
+    the life of the process but is NOT persisted (cloud disk is ephemeral).
+    Given Robinhood's ~9-day access-token lifetime, that's fine between
+    redeploys; when it finally expires you paste fresh tokens into secrets.
+    """
+
+    def __init__(self, client_info_json: str, tokens_json: str) -> None:
+        self._client_info = OAuthClientInformationFull.model_validate_json(
+            client_info_json
+        )
+        self._tokens = OAuthToken.model_validate_json(tokens_json)
+
+    async def get_client_info(self) -> OAuthClientInformationFull | None:
+        return self._client_info
+
+    async def set_client_info(self, client_info: OAuthClientInformationFull) -> None:
+        self._client_info = client_info
+
+    async def get_tokens(self) -> OAuthToken | None:
+        return self._tokens
+
+    async def set_tokens(self, tokens: OAuthToken) -> None:
+        self._tokens = tokens  # in-memory only; not persisted
+
+
+async def _headless_callback() -> tuple[str, str | None]:
+    """Callback handler for headless hosts. The browser flow is impossible
+    here, so fail fast and clearly instead of binding a localhost port."""
+    raise RuntimeError(
+        "Robinhood needs re-authentication, but this host can't run the "
+        "browser login. Re-auth locally (scripts/connect_robinhood) and "
+        "update the tokens in the deployment's secrets."
+    )
+
+
 def _build_redirect_handler():
     async def handler(url: str) -> None:
         print(
@@ -260,15 +303,22 @@ class RobinhoodMCPClient:
         server_url: str = DEFAULT_SERVER_URL,
         token_dir: Path | str = DEFAULT_TOKEN_DIR,
         callback_port: int = DEFAULT_CALLBACK_PORT,
+        storage: TokenStorage | None = None,
+        headless: bool = False,
     ) -> None:
         self._server_url = server_url
-        self._storage = FileTokenStorage(Path(token_dir))
+        # Caller may inject storage (e.g. InMemoryTokenStorage from secrets);
+        # otherwise fall back to on-disk cache for local use.
+        self._storage = storage or FileTokenStorage(Path(token_dir))
+        # On headless hosts (Streamlit Cloud) the browser flow is impossible —
+        # use a callback that fails clearly instead of binding a localhost port.
+        callback = _headless_callback if headless else _build_callback_handler(callback_port)
         self._auth = OAuthClientProvider(
             server_url=server_url,
             client_metadata=_build_client_metadata(),
             storage=self._storage,
             redirect_handler=_build_redirect_handler(),
-            callback_handler=_build_callback_handler(callback_port),
+            callback_handler=callback,
         )
         self._transport_cm = None
         self._session_cm = None
@@ -369,7 +419,12 @@ class RobinhoodMCPClient:
         raise NotImplementedError("cancel_order — implement in Phase 4")
 
 
-__all__ = ["RobinhoodMCPClient", "FileTokenStorage", "DEFAULT_SERVER_URL"]
+__all__ = [
+    "RobinhoodMCPClient",
+    "FileTokenStorage",
+    "InMemoryTokenStorage",
+    "DEFAULT_SERVER_URL",
+]
 
 
 # Static check that the class satisfies the Protocol.

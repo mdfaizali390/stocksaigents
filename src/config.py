@@ -1,6 +1,7 @@
 from functools import lru_cache
 from typing import Literal
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -20,6 +21,14 @@ class Settings(BaseSettings):
     cache_dir: str = "./.cache"
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator("anthropic_api_key", "finnhub_api_key", mode="before")
+    @classmethod
+    def _strip_whitespace(cls, v):
+        """Trim stray whitespace/newlines around keys. A space after the `=`
+        in .env (``KEY= sk-ant-...``) is a common, hard-to-spot cause of
+        401 'invalid x-api-key'. Strip it so it can never bite."""
+        return v.strip() if isinstance(v, str) else v
 
     def require_anthropic(self) -> str:
         if not self.anthropic_api_key:

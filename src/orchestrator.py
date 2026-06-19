@@ -306,8 +306,10 @@ class Orchestrator:
 
         if not facts.get("portfolio_loaded"):
             return (
-                "I couldn't load your portfolio data, so I can't answer that "
-                "right now. Check the brokerage connection and try again."
+                "Your brokerage isn't connected here, so I can't look up your "
+                "holdings. Questions about the market, news, or trending "
+                "stocks still work. (Portfolio access is available when "
+                "running locally with Robinhood connected.)"
             )
         prompt = (
             f"User question: {query}\n\n"
