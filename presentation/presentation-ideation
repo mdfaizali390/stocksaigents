@@ -1,0 +1,45 @@
+1. Open the presetation with name of the App - what it does on a very high level and add my name - By Faiz Ali - System Development Engineer - Amazon.
+   I will give my opening speech. This slide stays up fo like 3-4 mins.
+2. Give a disclaimer sort of. I just want to make it clear in a very soft way that the idea of this presetation is to learn AI. AI is the focus here not the stock trading which is subject to many micro and macro dynamics. The idea is how to adopt AI to solve our day to day simple to complex tasks
+3. In the third page - I would call out somebody from audiance - "Think about the last stock you bought" what made you buy that. That will automatically open up the problem or requirement.
+   In the slide I want an animation sort of when I press a key or click a button it would open or flash the reasons what we think of to buy stocks. We will turn this to agents we built in the upcoming slides. These may not be same as our AI agents. My audiance will likely say - On a friends advice or news or media (this will be one reason), How much did you buy? that would be our compliance agent. Think about cases like that
+4. In this Slide I want to explain what is an AI agent. and MCP
+   An AI agent is like a digital assistant that not only answers questions but can also perform tasks on your behalf.
+
+For example
+
+Goal: "Find the cheapest flight to Seattle."
+Agent actions:
+Search flight websites
+Compare prices
+Select the best options
+Present the results
+
+MCP (Model Context Protocol) - MCP is a standard way for AI agents to securely connect to external tools, applications, and data sources.
+
+MCP (Model Context Protocol)
+
+MCP is a standard way for AI agents to securely connect to external tools, applications, and data sources.
+
+Simple Analogy
+
+Think of an AI agent as a person in an office.
+
+Without MCP:
+
+The person has no access to company systems.
+They can only answer based on what they already know.
+
+With MCP:
+
+The person receives approved access to tools such as email, calendars, databases, and business applications.
+They can perform real work using those systems.
+Example
+
+User: "What meetings do I have today?"
+
+Using MCP, the AI agent can:
+
+Connect to your calendar
+Retrieve today's events
+Summarize your schedule

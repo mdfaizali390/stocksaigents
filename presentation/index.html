@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>StockAIgents — Faiz Ali</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@800;900&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { width: 100%; height: 100%; background: #0d1117; font-family: 'Outfit', sans-serif; color: #e6edf3; overflow: hidden; }
+    #root { width: 100%; height: 100%; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --text:      #e6edf3;
+      --muted:     #8b949e;
+      --accent:    #a371f7;
+      --accent2:   #79c0ff;
+    }
+
+    .slide {
+      width: 100vw; height: 100vh;
+      display: flex; flex-direction: column;
+      justify-content: center; align-items: center;
+      padding: 80px;
+      background: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(110,64,201,0.25) 0%, transparent 70%), #0d1117;
+      position: relative; overflow: hidden;
+    }
+
+    .slide-wrapper { position: absolute; inset: 0; transition: opacity 0.5s ease, transform 0.5s ease; }
+    .slide-wrapper.active  { opacity: 1; transform: translateX(0); pointer-events: all; }
+    .slide-wrapper.left    { opacity: 0; transform: translateX(-40px); pointer-events: none; }
+    .slide-wrapper.right   { opacity: 0; transform: translateX(40px); pointer-events: none; }
+
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); cursor: pointer; transition: all 0.3s; }
+    .dot.active { background: var(--accent); }
+
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.4;} }
+    .pulse { animation: pulse 2s ease-in-out infinite; }
+
+    .reason-card {
+      opacity: 0;
+      transform: translateY(24px) scale(0.95);
+      transition: opacity 0.5s cubic-bezier(0.22,1,0.36,1), transform 0.5s cubic-bezier(0.22,1,0.36,1);
+    }
+    .reason-card.visible {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+
+    /* MCP hub diagram */
+    @keyframes float-soft { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-6px);} }
+    @keyframes glow-pulse { 0%,100%{box-shadow:0 0 30px rgba(163,113,247,0.35), 0 0 0 1px rgba(163,113,247,0.4);} 50%{box-shadow:0 0 55px rgba(163,113,247,0.55), 0 0 0 1px rgba(163,113,247,0.6);} }
+    @keyframes dash-flow { to { stroke-dashoffset: -16; } }
+    .mcp-hub { animation: glow-pulse 3s ease-in-out infinite; }
+    .mcp-tool { animation: float-soft 4s ease-in-out infinite; }
+    .mcp-line { stroke-dasharray: 5 4; animation: dash-flow 0.8s linear infinite; }
+
+    /* architecture flow cascade */
+    @keyframes arch-in {
+      from { opacity: 0; transform: translateY(-14px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .arch-step {
+      opacity: 0;
+      animation: arch-in 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+    }
+  </style>
+</head>
+<body>
+<script type="text/babel">
+
+const { useState, useEffect, useCallback } = React;
+
+function TitleSlide({ isActive }) {
+  // floating agent emojis scattered around the hero
+  const floats = [
+    { e:'📰', top:'18%',  left:'12%',  size:'2.4rem', dur:'5s',   delay:'0s'   },
+    { e:'📈', top:'24%',  left:'84%',  size:'2.8rem', dur:'6s',   delay:'0.6s' },
+    { e:'🔥', top:'68%',  left:'8%',   size:'2.6rem', dur:'5.5s', delay:'1.1s' },
+    { e:'⚖️', top:'74%',  left:'88%',  size:'2.4rem', dur:'6.5s', delay:'0.3s' },
+    { e:'🧠', top:'14%',  left:'62%',  size:'2rem',   dur:'5.2s', delay:'1.4s' },
+    { e:'🛡️', top:'80%',  left:'40%',  size:'2.2rem', dur:'6.2s', delay:'0.9s' },
+  ];
+
+  return (
+    <div className="slide" style={{
+      alignItems:'center', justifyContent:'center', overflow:'hidden',
+      background:'radial-gradient(ellipse 90% 70% at 50% 42%, rgba(110,64,201,0.32) 0%, transparent 70%), #0d1117',
+    }}>
+
+      {/* floating agent emojis */}
+      {floats.map((f, i) => (
+        <span key={i} className="mcp-tool" style={{
+          position:'absolute', top:f.top, left:f.left,
+          fontSize:f.size, opacity:0.25,
+          animation:`float-soft ${f.dur} ease-in-out infinite`,
+          animationDelay:f.delay, pointerEvents:'none',
+          filter:'grayscale(0.2)',
+        }}>{f.e}</span>
+      ))}
+
+      <div key={isActive ? 'on' : 'off'} style={{textAlign:'center', maxWidth:'900px', width:'100%', position:'relative', zIndex:1}}>
+
+        {/* badge */}
+        <div className="arch-step" style={{
+          animationDelay:'0s',
+          display:'inline-flex', alignItems:'center', gap:'8px',
+          padding:'7px 18px', borderRadius:'999px', marginBottom:'2.5rem',
+          background:'rgba(163,113,247,0.1)', border:'1px solid rgba(163,113,247,0.3)',
+        }}>
+          <span className="pulse" style={{width:'7px', height:'7px', borderRadius:'50%', background:'#a371f7', display:'inline-block'}} />
+          <span style={{color:'#a371f7', fontSize:'0.85rem', fontWeight:700, letterSpacing:'0.1em'}}>AI-POWERED · MULTI-AGENT</span>
+        </div>
+
+        {/* wordmark */}
+        <h1 className="arch-step" style={{
+          animationDelay:'0.12s',
+          fontFamily:"'Inter', sans-serif",
+          fontSize:'clamp(4rem, 11vw, 9rem)',
+          fontWeight:900, lineHeight:0.95,
+          letterSpacing:'-0.045em', marginBottom:'1.5rem',
+          color:'#e6edf3',
+        }}>
+          Stock<span style={{
+            background:'linear-gradient(135deg, #a371f7, #79c0ff)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+          }}>AI</span>gents
+        </h1>
+
+        {/* tagline */}
+        <p className="arch-step" style={{
+          animationDelay:'0.24s',
+          fontSize:'clamp(1.15rem, 2.2vw, 1.6rem)',
+          color:'#8b949e', fontWeight:300,
+          lineHeight:1.6, margin:'0 auto 3rem', maxWidth:'600px',
+          letterSpacing:'0.01em',
+        }}>
+          Your personal team of AI agents for{' '}
+          <span style={{color:'#e6edf3'}}>smarter, safer investing decisions.</span>
+        </p>
+
+        {/* author chip */}
+        <div className="arch-step" style={{
+          animationDelay:'0.36s',
+          display:'inline-flex', alignItems:'center', gap:'0.9rem',
+          padding:'0.6rem 1.4rem 0.6rem 0.6rem', borderRadius:'999px',
+          background:'rgba(22,27,34,0.7)', border:'1px solid #30363d',
+          backdropFilter:'blur(8px)',
+        }}>
+          <div style={{
+            width:'40px', height:'40px', borderRadius:'50%',
+            background:'linear-gradient(135deg, #a371f7, #7c4dff)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'1.05rem', fontWeight:700, color:'white', flexShrink:0,
+          }}>F</div>
+          <div style={{textAlign:'left'}}>
+            <p style={{fontSize:'1rem', fontWeight:600, color:'#e6edf3', margin:0}}>Faiz Ali</p>
+            <p style={{fontSize:'0.82rem', color:'#8b949e', margin:0}}>System Development Engineer · Amazon</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+function DisclaimerSlide() {
+  const caps = [
+    { icon:'🧠', label:'Reasons' },
+    { icon:'🛡️', label:'Enforces rules' },
+    { icon:'👁️', label:'Detects bad habits' },
+    { icon:'💬', label:'Explains its thinking' },
+  ];
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'48px 5vw 120px'}}>
+      <div style={{width:'100%', maxWidth:'1100px'}}>
+
+        <div style={{textAlign:'center', marginBottom:'2.5rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'1.25rem'}}>
+            Before we start
+          </p>
+          <h2 style={{
+            fontFamily:"'Inter', sans-serif",
+            fontSize:'clamp(2.6rem, 5vw, 4rem)',
+            fontWeight:800, lineHeight:1.1,
+            letterSpacing:'-0.03em', color:'#e6edf3',
+          }}>
+            You might expect a{' '}
+            <span style={{color:'#6e7681'}}>trading app</span>.
+          </h2>
+        </div>
+
+        {/* What it actually is — capability cards */}
+        <p style={{textAlign:'center', fontSize:'1.4rem', color:'#8b949e', marginBottom:'1.75rem'}}>
+          What you'll actually see is an{' '}
+          <span style={{color:'#a371f7', fontWeight:600}}>AI system</span> that:
+        </p>
+
+        <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'1rem', marginBottom:'2.75rem'}}>
+          {caps.map(c => (
+            <div key={c.label} style={{
+              padding:'1.5rem 1rem', borderRadius:'18px',
+              background:'linear-gradient(135deg, rgba(163,113,247,0.1), rgba(121,192,255,0.05))',
+              border:'1px solid rgba(163,113,247,0.3)',
+              display:'flex', flexDirection:'column', alignItems:'center', gap:'0.75rem',
+              textAlign:'center',
+            }}>
+              <span style={{fontSize:'2.4rem', lineHeight:1}}>{c.icon}</span>
+              <span style={{fontSize:'1.25rem', fontWeight:700, color:'#e6edf3', lineHeight:1.2}}>{c.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Punchline */}
+        <div style={{textAlign:'center'}}>
+          <p style={{fontSize:'1.2rem', color:'#8b949e', marginBottom:'1.5rem', lineHeight:1.6}}>
+            Stocks just make it easy to relate to.{' '}
+            <span style={{color:'#e6edf3', fontWeight:600}}>The pattern works for any domain.</span>
+          </p>
+          <p style={{
+            fontFamily:"'Inter', sans-serif",
+            fontSize:'clamp(1.5rem, 2.6vw, 2.1rem)', fontWeight:800, fontStyle:'italic',
+            lineHeight:1.35,
+            background:'linear-gradient(135deg, #a371f7, #79c0ff)',
+            WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+            display:'inline-block',
+          }}>
+            "The stocks are just the excuse.<br/>The agents are the point."
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+const REASONS = [
+  { emoji:'📰', label:'Saw it in the news',          agent:'Research Agent',   delay:0   },
+  { emoji:'👥', label:"Friend's tip",                agent:'Behavioral Agent', delay:200 },
+  { emoji:'📱', label:'Social media buzz',           agent:'Trending Agent',   delay:400 },
+  { emoji:'📈', label:'Chart looked good',           agent:'Quant Agent',      delay:600 },
+  { emoji:'💰', label:'How much should I buy?',      agent:'Risk Agent',       delay:800 },
+  { emoji:'🛡️', label:'Is this trade even allowed?', agent:'Compliance Agent', delay:1000 },
+];
+
+function AudienceSlide() {
+  const [visibleCount, setVisibleCount] = useState(0);
+  const [agentsRevealed, setAgentsRevealed] = useState(false);
+
+  const revealNext = useCallback(() => {
+    setVisibleCount(c => {
+      if (c < REASONS.length) return c + 1;
+      // All cards shown — this click reveals the agent labels
+      setAgentsRevealed(true);
+      return c;
+    });
+  }, []);
+
+  useEffect(() => {
+    const handler = (e) => { if (e.code === 'Space') { e.preventDefault(); revealNext(); } };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [revealNext]);
+
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'48px 5vw 120px'}}>
+      <div style={{width:'100%', maxWidth:'1180px', textAlign:'center'}}>
+
+        <p style={{ fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'1.25rem'}}>
+          Audience question
+        </p>
+
+        <h2 style={{ fontFamily:"'Inter', sans-serif", fontSize:'clamp(2.6rem, 5vw, 4rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3', marginBottom:'0.75rem'}}>
+          Think about the last stock <span style={{color:'#a371f7'}}>you</span> bought.
+        </h2>
+        <p style={{ fontSize:'1.5rem', color:'#8b949e', marginBottom:'2rem'}}>
+          What made you buy it?
+        </p>
+
+        {!agentsRevealed && (
+          <div style={{marginBottom:'2rem', display:'flex', justifyContent:'center', alignItems:'center', gap:'1rem'}}>
+            <button onClick={revealNext} style={{
+              padding:'14px 36px', borderRadius:'999px',
+              background:'#a371f7', border:'none',
+              color:'white', fontSize:'1.1rem', fontWeight:700,
+              cursor:'pointer', letterSpacing:'0.02em',
+              boxShadow:'0 4px 20px rgba(163,113,247,0.5)',
+            }}>
+              {visibleCount === 0 ? 'Reveal →' : 'Next →'}
+            </button>
+            <span style={{fontSize:'0.85rem', color:'var(--border)'}}>or press Space</span>
+          </div>
+        )}
+
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:'1rem'}}>
+          {REASONS.map((r, i) => (
+            <div key={r.label}
+              className={`reason-card ${i < visibleCount ? 'visible' : ''}`}
+              style={{
+                padding:'2rem 1.75rem',
+                borderRadius:'16px',
+                background:'rgba(22,27,34,0.9)',
+                border: i < visibleCount ? '1px solid rgba(163,113,247,0.4)' : '1px solid var(--border)',
+                backdropFilter:'blur(12px)',
+                transitionDelay:`${r.delay}ms`,
+                textAlign:'left',
+                minHeight:'160px',
+                display:'flex', flexDirection:'column', justifyContent:'space-between',
+              }}>
+              <div>
+                <div style={{fontSize:'2.8rem', marginBottom:'1rem', lineHeight:1}}>{r.emoji}</div>
+                <div style={{
+                  
+                  fontSize:'1.6rem', fontWeight:700,
+                  color:'#e6edf3', marginBottom:'0.6rem',
+                  lineHeight:1.2,
+                }}>{r.label}</div>
+              </div>
+              <div style={{
+                
+                fontSize:'1.35rem', fontWeight:700,
+                color:'#a371f7', letterSpacing:'0.01em',
+                marginTop:'0.75rem',
+                opacity: agentsRevealed ? 1 : 0,
+                transform: agentsRevealed ? 'translateY(0)' : 'translateY(6px)',
+                transition:`opacity 0.4s ease ${i * 80}ms, transform 0.4s ease ${i * 80}ms`,
+              }}>→ {r.agent}</div>
+            </div>
+          ))}
+        </div>
+
+        {agentsRevealed && (
+          <p style={{
+            marginTop:'2rem', fontSize:'1.4rem',
+            color:'#e6edf3', fontWeight:600,
+          }}>
+            These intuitions became our{' '}
+            <span style={{color:'#a371f7'}}>agents</span>.
+          </p>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 4: What is an AI Agent ────────────────────────────────────────────
+function AgentSlide() {
+  const steps = [
+    { icon:'🔍', label:'Search flight websites' },
+    { icon:'⚖️', label:'Compare prices' },
+    { icon:'✅', label:'Select the best option' },
+    { icon:'📊', label:'Present the results' },
+  ];
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'48px 5vw 120px'}}>
+      <div style={{width:'100%', maxWidth:'1240px', textAlign:'center'}}>
+
+        <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'1rem'}}>
+          Concept
+        </p>
+
+        <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(3rem, 5.5vw, 4.5rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3', marginBottom:'1.25rem'}}>
+          What is an AI Agent?
+        </h2>
+
+        <p style={{fontSize:'1.5rem', color:'#8b949e', lineHeight:1.6, marginBottom:'2.75rem', maxWidth:'820px', margin:'0 auto 2.75rem'}}>
+          A digital assistant that not only{' '}
+          <span style={{color:'#e6edf3', fontWeight:600}}>answers questions</span>{' '}
+          but can also{' '}
+          <span style={{color:'#e6edf3', fontWeight:600}}>perform tasks</span>{' '}
+          on your behalf.
+        </p>
+
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'1.75rem', alignItems:'stretch', textAlign:'left'}}>
+
+          {/* Left — goal + steps */}
+          <div>
+            <div style={{
+              padding:'1.75rem 2rem', borderRadius:'18px', marginBottom:'1.25rem',
+              background:'rgba(163,113,247,0.08)',
+              border:'1px solid rgba(163,113,247,0.3)',
+            }}>
+              <p style={{fontSize:'0.9rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:'0.6rem'}}>User Goal</p>
+              <p style={{fontSize:'1.7rem', fontWeight:700, color:'#e6edf3', lineHeight:1.3}}>
+                "Find the cheapest flight to Seattle."
+              </p>
+            </div>
+
+            <div style={{display:'flex', flexDirection:'column', gap:'0.85rem'}}>
+              {steps.map((s) => (
+                <div key={s.label} style={{
+                  display:'flex', alignItems:'center', gap:'1.25rem',
+                  padding:'1.2rem 1.6rem', borderRadius:'14px',
+                  background:'rgba(22,27,34,0.8)',
+                  border:'1px solid #30363d',
+                }}>
+                  <span style={{fontSize:'2rem', flexShrink:0}}>{s.icon}</span>
+                  <span style={{fontSize:'1.35rem', color:'#e6edf3', fontWeight:500}}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right — key shift */}
+          <div style={{
+            display:'flex', flexDirection:'column', justifyContent:'center',
+            padding:'2.5rem', borderRadius:'18px',
+            background:'rgba(22,27,34,0.6)', border:'1px solid #30363d',
+            height:'100%',
+          }}>
+            <p style={{fontSize:'0.9rem', fontWeight:700, color:'#8b949e', letterSpacing:'0.1em', textTransform:'uppercase', marginBottom:'2rem'}}>The key shift</p>
+
+            <div style={{marginBottom:'2.25rem'}}>
+              <p style={{fontSize:'1.1rem', color:'#8b949e', marginBottom:'0.6rem', fontWeight:500}}>Traditional AI</p>
+              <p style={{fontSize:'1.8rem', color:'#e6edf3', fontWeight:700, lineHeight:1.4}}>Answers your question.</p>
+            </div>
+
+            <div style={{width:'100%', height:'1px', background:'#30363d', marginBottom:'2.25rem'}} />
+
+            <div>
+              <p style={{fontSize:'1.1rem', color:'#a371f7', marginBottom:'0.6rem', fontWeight:600}}>AI Agent</p>
+              <p style={{fontSize:'1.8rem', color:'#e6edf3', fontWeight:700, lineHeight:1.4}}>
+                Takes action. Uses tools.<br/>Gets the job done.
+              </p>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 5: What is MCP ─────────────────────────────────────────────────────
+function MCPSlide() {
+  const tools = [
+    { icon:'📅', label:'Calendar' },
+    { icon:'📧', label:'Email' },
+    { icon:'🗄️', label:'Databases' },
+    { icon:'📊', label:'Robinhood' },
+    { icon:'📰', label:'Finnhub' },
+    { icon:'💬', label:'Stocktwits' },
+  ];
+
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'48px 5vw 120px'}}>
+      <div style={{width:'100%', maxWidth:'1240px'}}>
+
+        {/* Header */}
+        <div style={{textAlign:'center', marginBottom:'2.75rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'1rem'}}>
+            Concept
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(3rem, 5.5vw, 4.5rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3', marginBottom:'1.25rem'}}>
+            What is MCP?
+          </h2>
+          <p style={{fontSize:'1.5rem', color:'#8b949e', lineHeight:1.6, margin:'0 auto', maxWidth:'880px'}}>
+            <span style={{color:'#e6edf3', fontWeight:600}}>Model Context Protocol</span>{' '}
+            — the universal port that lets an AI agent securely plug into external tools and data.
+          </p>
+        </div>
+
+        {/* Hub-and-spoke diagram */}
+        <div style={{
+          display:'grid',
+          gridTemplateColumns:'1fr auto 1fr',
+          alignItems:'center',
+          gap:'0',
+          background:'rgba(22,27,34,0.5)',
+          border:'1px solid #30363d',
+          borderRadius:'28px',
+          padding:'3rem 3.5rem',
+        }}>
+
+          {/* LEFT — Agent */}
+          <div style={{display:'flex', flexDirection:'column', alignItems:'center', gap:'1rem'}}>
+            <div className="mcp-hub" style={{
+              width:'180px', height:'180px', borderRadius:'34px',
+              background:'linear-gradient(135deg, #a371f7, #7c4dff)',
+              display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+              gap:'0.25rem',
+            }}>
+              <span style={{fontSize:'4rem', lineHeight:1}}>🤖</span>
+            </div>
+            <p style={{fontSize:'1.5rem', fontWeight:700, color:'#e6edf3'}}>AI Agent</p>
+            <p style={{fontSize:'1.1rem', color:'#8b949e', textAlign:'center', maxWidth:'220px', lineHeight:1.4}}>
+              Reasons &amp; decides what it needs
+            </p>
+          </div>
+
+          {/* CENTER — MCP connector */}
+          <div style={{display:'flex', flexDirection:'column', alignItems:'center', padding:'0 1.75rem'}}>
+            <svg width="150" height="70" viewBox="0 0 150 70" style={{overflow:'visible'}}>
+              <line className="mcp-line" x1="0" y1="35" x2="150" y2="35" stroke="#a371f7" strokeWidth="3" />
+            </svg>
+            <div style={{
+              padding:'0.75rem 1.75rem', borderRadius:'999px', marginTop:'-0.6rem',
+              background:'rgba(163,113,247,0.12)', border:'1.5px solid rgba(163,113,247,0.5)',
+              backdropFilter:'blur(4px)',
+            }}>
+              <p style={{fontSize:'1.4rem', fontWeight:800, color:'#a371f7', letterSpacing:'0.08em'}}>MCP</p>
+            </div>
+            <p style={{fontSize:'1rem', color:'#8b949e', marginTop:'0.75rem', textAlign:'center'}}>secure, standard link</p>
+          </div>
+
+          {/* RIGHT — Tools grid */}
+          <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1rem'}}>
+            {tools.map((t, i) => (
+              <div key={t.label} className="mcp-tool" style={{
+                animationDelay:`${i * 0.4}s`,
+                padding:'1.2rem 0.6rem', borderRadius:'16px',
+                background:'rgba(13,17,23,0.8)', border:'1px solid #30363d',
+                display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem',
+              }}>
+                <span style={{fontSize:'2.2rem', lineHeight:1}}>{t.icon}</span>
+                <span style={{fontSize:'1rem', fontWeight:600, color:'#c9d1d9'}}>{t.label}</span>
+              </div>
+            ))}
+          </div>
+
+        </div>
+
+        {/* Bottom one-liner */}
+        <p style={{textAlign:'center', fontSize:'1.4rem', color:'#8b949e', marginTop:'2.25rem', lineHeight:1.6}}>
+          Without MCP, an agent only knows what it was trained on.{' '}
+          <span style={{color:'#e6edf3', fontWeight:600}}>With MCP, it acts on live, real-world data.</span>
+        </p>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 6: Our Agents ──────────────────────────────────────────────────────
+const SPECIALISTS = [
+  { emoji:'📰', name:'Research',   role:'Reads recent news, earnings & filings to form a view.', tools:['Finnhub'] },
+  { emoji:'📈', name:'Quant',      role:'Computes technical indicators — RSI, moving averages, momentum.', tools:['yfinance'] },
+  { emoji:'🔥', name:'Trending',   role:'Ranks the hottest stocks by social buzz and price action.', tools:['Stocktwits','Finnhub','yfinance'] },
+  { emoji:'⚖️', name:'Risk',       role:'Checks concentration, sector exposure and cash limits.', tools:['Robinhood','Finnhub'] },
+  { emoji:'🧠', name:'Behavioral', role:'Scans your trade history for FOMO, panic, overtrading.', tools:['Robinhood'] },
+  { emoji:'🛡️', name:'Compliance', role:'Enforces your hard trading rules. Pure logic, no LLM.', tools:['Constitution'] },
+];
+
+function AgentsSlide() {
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'40px 5vw 110px'}}>
+      <div style={{width:'100%', maxWidth:'1280px'}}>
+
+        {/* Header */}
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'0.9rem'}}>
+            The Team
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(2.4rem, 5vw, 3.8rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3'}}>
+            Six specialists, one{' '}
+            <span style={{color:'#a371f7'}}>decision</span>.
+          </h2>
+        </div>
+
+        {/* Specialist grid */}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.1rem', marginBottom:'1.5rem'}}>
+          {SPECIALISTS.map(a => (
+            <div key={a.name} style={{
+              padding:'1.5rem 1.6rem', borderRadius:'18px',
+              background:'rgba(22,27,34,0.85)', border:'1px solid #30363d',
+              display:'flex', flexDirection:'column', gap:'0.6rem',
+            }}>
+              <div style={{display:'flex', alignItems:'center', gap:'0.9rem'}}>
+                <span style={{fontSize:'2.2rem', lineHeight:1}}>{a.emoji}</span>
+                <span style={{fontSize:'1.5rem', fontWeight:700, color:'#e6edf3'}}>{a.name}</span>
+              </div>
+              <p style={{fontSize:'1.02rem', color:'#8b949e', lineHeight:1.5}}>{a.role}</p>
+              <div style={{display:'flex', flexWrap:'wrap', gap:'0.4rem', marginTop:'0.2rem'}}>
+                {a.tools.map(t => (
+                  <span key={t} style={{
+                    fontSize:'0.8rem', fontWeight:600, color:'#79c0ff',
+                    padding:'0.2rem 0.7rem', borderRadius:'999px',
+                    background:'rgba(121,192,255,0.1)', border:'1px solid rgba(121,192,255,0.25)',
+                  }}>{t}</span>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Portfolio Manager — synthesizer */}
+        <div style={{
+          padding:'1.4rem 2rem', borderRadius:'18px',
+          background:'linear-gradient(135deg, rgba(163,113,247,0.12), rgba(121,192,255,0.06))',
+          border:'1px solid rgba(163,113,247,0.4)',
+          display:'flex', flexDirection:'column', alignItems:'center', gap:'0.5rem',
+          position:'relative', overflow:'hidden', textAlign:'center',
+        }}>
+          <div style={{position:'absolute', top:0, left:0, right:0, height:'2px', background:'linear-gradient(90deg,#a371f7,#79c0ff)'}} />
+          <div style={{display:'flex', alignItems:'center', gap:'0.75rem'}}>
+            <span style={{fontSize:'2.4rem', lineHeight:1}}>🎯</span>
+            <p style={{fontSize:'1.5rem', fontWeight:700, color:'#e6edf3'}}>
+              Portfolio Manager
+            </p>
+          </div>
+          <p style={{fontSize:'1.05rem', color:'#8b949e', lineHeight:1.5, maxWidth:'700px'}}>
+            Reads all six reports and synthesizes a single recommendation — <span style={{color:'#e6edf3', fontWeight:600}}>you make the final call.</span>
+          </p>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 7: Architecture ────────────────────────────────────────────────────
+function ArchitectureSlide({ isActive }) {
+  const agents = [
+    { emoji:'📰', name:'Research' },
+    { emoji:'📈', name:'Quant' },
+    { emoji:'🔥', name:'Trending' },
+    { emoji:'⚖️', name:'Risk' },
+    { emoji:'🧠', name:'Behavioral' },
+    { emoji:'🛡️', name:'Compliance' },
+  ];
+
+  // each flow element gets a step index → staggered animation delay
+  let step = 0;
+  const delay = () => `${(step++) * 0.22}s`;
+
+  const Arrow = () => (
+    <div className="arch-step" style={{animationDelay:delay(), display:'flex', justifyContent:'center', color:'#a371f7', fontSize:'1.1rem', lineHeight:1, margin:'0.15rem 0'}}>↓</div>
+  );
+
+  const Node = ({ children, accent, sub }) => (
+    <div className="arch-step" style={{
+      animationDelay:delay(),
+      padding:'0.6rem 1.4rem', borderRadius:'12px',
+      background: accent ? 'rgba(163,113,247,0.12)' : 'rgba(22,27,34,0.85)',
+      border: accent ? '1px solid rgba(163,113,247,0.5)' : '1px solid #30363d',
+      textAlign:'center', minWidth:'240px',
+    }}>
+      <p style={{fontSize:'1.05rem', fontWeight:700, color: accent ? '#c8a8fa' : '#e6edf3'}}>{children}</p>
+      {sub && <p style={{fontSize:'0.78rem', color:'#8b949e', marginTop:'0.1rem'}}>{sub}</p>}
+    </div>
+  );
+
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'28px 5vw 96px'}}>
+      <div style={{width:'100%', maxWidth:'1040px'}}>
+
+        <div style={{textAlign:'center', marginBottom:'1rem'}}>
+          <p style={{fontSize:'0.85rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'0.5rem'}}>
+            Under the hood
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(1.9rem, 4vw, 2.8rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3'}}>
+            How it all{' '}<span style={{color:'#a371f7'}}>connects</span>.
+          </h2>
+        </div>
+
+        <div key={isActive ? 'on' : 'off'} style={{display:'flex', flexDirection:'column', alignItems:'center'}}>
+
+          <Node>💬 User Query</Node>
+          <Arrow/>
+          <Node accent sub="LLM · picks which agents to run">🗺️ Intent Router</Node>
+          <Arrow/>
+          <Node sub="loads portfolio · market data · Constitution">⚙️ Orchestrator</Node>
+          <Arrow/>
+
+          {/* Parallel agents */}
+          <div className="arch-step" style={{
+            animationDelay:delay(),
+            width:'100%', padding:'0.85rem 1rem',
+            borderRadius:'16px', border:'1px dashed #30363d',
+            background:'rgba(22,27,34,0.4)',
+          }}>
+            <p style={{textAlign:'center', fontSize:'0.72rem', fontWeight:700, color:'#8b949e', letterSpacing:'0.12em', textTransform:'uppercase', marginBottom:'0.6rem'}}>
+              Six agents run in parallel
+            </p>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(6, 1fr)', gap:'0.5rem'}}>
+              {agents.map((a, i) => (
+                <div key={a.name} className="arch-step" style={{
+                  animationDelay:`${1.2 + i * 0.1}s`,
+                  padding:'0.55rem 0.3rem', borderRadius:'10px',
+                  background:'rgba(13,17,23,0.8)', border:'1px solid #30363d',
+                  display:'flex', flexDirection:'column', alignItems:'center', gap:'0.25rem',
+                }}>
+                  <span style={{fontSize:'1.3rem', lineHeight:1}}>{a.emoji}</span>
+                  <span style={{fontSize:'0.78rem', fontWeight:600, color:'#c9d1d9'}}>{a.name}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Arrow/>
+          <div className="arch-step" style={{
+            animationDelay:delay(),
+            padding:'0.5rem 1.25rem', borderRadius:'999px',
+            background:'rgba(248,81,73,0.1)', border:'1px solid rgba(248,81,73,0.4)',
+          }}>
+            <p style={{fontSize:'0.9rem', fontWeight:600, color:'#ff7b72'}}>🛑 Block check — any hard violation stops the trade</p>
+          </div>
+          <Arrow/>
+          <Node accent sub="synthesizes all six reports">🎯 Portfolio Manager</Node>
+          <Arrow/>
+          <Node sub="action · confidence · reasoning — you decide">✅ Recommendation</Node>
+
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 8: What you need ───────────────────────────────────────────────────
+const REQUIREMENTS = [
+  {
+    emoji:'📊', name:'Robinhood',
+    purpose:'Your live brokerage — portfolio, positions, orders.',
+    auth:'Connected via MCP', authType:'oauth',
+    note:'One-time browser login. No API key.',
+  },
+  {
+    emoji:'🤖', name:'Anthropic Claude',
+    purpose:'Powers every agent\'s reasoning.',
+    auth:'API key required', authType:'key',
+    note:'console.anthropic.com',
+  },
+  {
+    emoji:'📡', name:'Finnhub',
+    purpose:'News, earnings, filings, analyst ratings.',
+    auth:'API key required', authType:'key',
+    note:'Free tier — 60 calls/min',
+  },
+  {
+    emoji:'💬', name:'Stocktwits',
+    purpose:'Social buzz & trending tickers.',
+    auth:'Public API', authType:'free',
+    note:'No key, no sign-up',
+  },
+  {
+    emoji:'📈', name:'yfinance',
+    purpose:'Price history & volume for indicators.',
+    auth:'Open library', authType:'free',
+    note:'No key — pip install',
+  },
+];
+
+const AUTH_STYLE = {
+  oauth: { color:'#79c0ff', bg:'rgba(121,192,255,0.12)', border:'rgba(121,192,255,0.3)' },
+  key:   { color:'#f0a868', bg:'rgba(240,168,104,0.12)', border:'rgba(240,168,104,0.3)' },
+  free:  { color:'#56d364', bg:'rgba(86,211,100,0.12)',  border:'rgba(86,211,100,0.3)' },
+};
+
+function RequirementsSlide() {
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'40px 5vw 110px'}}>
+      <div style={{width:'100%', maxWidth:'1080px'}}>
+
+        <div style={{textAlign:'center', marginBottom:'2rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'0.9rem'}}>
+            Setup
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(2.4rem, 5vw, 3.8rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3'}}>
+            What you{' '}<span style={{color:'#a371f7'}}>need</span>.
+          </h2>
+        </div>
+
+        <div style={{display:'flex', flexDirection:'column', gap:'0.9rem'}}>
+          {REQUIREMENTS.map(r => {
+            const s = AUTH_STYLE[r.authType];
+            return (
+              <div key={r.name} style={{
+                display:'flex', alignItems:'center', gap:'1.25rem',
+                padding:'1.1rem 1.5rem', borderRadius:'16px',
+                background:'rgba(22,27,34,0.85)', border:'1px solid #30363d',
+              }}>
+                <span style={{fontSize:'2.2rem', lineHeight:1, flexShrink:0, width:'2.6rem', textAlign:'center'}}>{r.emoji}</span>
+                <div style={{flex:1, minWidth:0}}>
+                  <p style={{fontSize:'1.35rem', fontWeight:700, color:'#e6edf3'}}>{r.name}</p>
+                  <p style={{fontSize:'1rem', color:'#8b949e', lineHeight:1.4}}>{r.purpose}</p>
+                </div>
+                <div style={{textAlign:'right', flexShrink:0}}>
+                  <span style={{
+                    display:'inline-block', fontSize:'0.85rem', fontWeight:700,
+                    color:s.color, padding:'0.3rem 0.9rem', borderRadius:'999px',
+                    background:s.bg, border:`1px solid ${s.border}`,
+                  }}>{r.auth}</span>
+                  <p style={{fontSize:'0.82rem', color:'#6e7681', marginTop:'0.35rem'}}>{r.note}</p>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <p style={{textAlign:'center', fontSize:'1.05rem', color:'#8b949e', marginTop:'1.75rem'}}>
+          All free tier. <span style={{color:'#e6edf3', fontWeight:600}}>Total cost to run this: roughly the price of a coffee.</span>
+        </p>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 9: Development stages ──────────────────────────────────────────────
+const STAGES = [
+  { num:'01', emoji:'💡', name:'Ideation',        desc:'Defined the idea, agents, and scope in plain English.' },
+  { num:'02', emoji:'📐', name:'Technical Design', desc:'Claude turned the brief into a full architecture doc.' },
+  { num:'03', emoji:'⌨️', name:'Coding',          desc:'Built agents, data layer, and orchestrator — phase by phase.' },
+  { num:'04', emoji:'🧪', name:'Testing',          desc:'Unit tests for rules, indicators & block enforcement.' },
+  { num:'05', emoji:'🖥️', name:'UI & Demo',        desc:'Streamlit app + this live presentation.' },
+  { num:'06', emoji:'🚀', name:'Deployment',       desc:'Streamlit Cloud — shareable, anytime access.' },
+];
+
+function StagesSlide({ isActive }) {
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'40px 5vw 110px'}}>
+      <div style={{width:'100%', maxWidth:'1180px'}}>
+
+        <div style={{textAlign:'center', marginBottom:'2.25rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'0.9rem'}}>
+            The Journey
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(2.4rem, 5vw, 3.8rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3'}}>
+            From idea to{' '}<span style={{color:'#a371f7'}}>live app</span>.
+          </h2>
+        </div>
+
+        {/* timeline */}
+        <div key={isActive ? 'on' : 'off'} style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'1.1rem'}}>
+          {STAGES.map((s, i) => (
+            <div key={s.name} className="arch-step" style={{
+              animationDelay:`${i * 0.15}s`,
+              padding:'1.5rem 1.6rem', borderRadius:'18px',
+              background:'rgba(22,27,34,0.85)', border:'1px solid #30363d',
+              position:'relative', overflow:'hidden',
+            }}>
+              <div style={{position:'absolute', top:0, left:0, bottom:0, width:'3px', background:'linear-gradient(180deg,#a371f7,#79c0ff)'}} />
+              <div style={{display:'flex', alignItems:'center', gap:'0.8rem', marginBottom:'0.6rem'}}>
+                <span style={{fontSize:'1.05rem', fontWeight:800, color:'#a371f7', fontFamily:"'Inter', sans-serif"}}>{s.num}</span>
+                <span style={{fontSize:'1.8rem', lineHeight:1}}>{s.emoji}</span>
+                <span style={{fontSize:'1.35rem', fontWeight:700, color:'#e6edf3'}}>{s.name}</span>
+              </div>
+              <p style={{fontSize:'1rem', color:'#8b949e', lineHeight:1.5}}>{s.desc}</p>
+            </div>
+          ))}
+        </div>
+
+        <p style={{textAlign:'center', fontSize:'1.1rem', color:'#8b949e', marginTop:'2rem'}}>
+          A human stayed in the loop at{' '}
+          <span style={{color:'#e6edf3', fontWeight:600}}>every stage</span> — reviewing, steering, approving.
+        </p>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 10: Demo ───────────────────────────────────────────────────────────
+function DemoSlide() {
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center'}}>
+      <div style={{textAlign:'center', maxWidth:'820px'}}>
+
+        <div style={{
+          display:'inline-flex', alignItems:'center', gap:'10px',
+          padding:'6px 18px', borderRadius:'999px', marginBottom:'2.5rem',
+          background:'rgba(86,211,100,0.1)', border:'1px solid rgba(86,211,100,0.35)',
+        }}>
+          <span className="pulse" style={{width:'8px', height:'8px', borderRadius:'50%', background:'#56d364', display:'inline-block'}} />
+          <span style={{color:'#56d364', fontSize:'0.85rem', fontWeight:700, letterSpacing:'0.1em'}}>LIVE</span>
+        </div>
+
+        <h1 style={{
+          fontFamily:"'Inter', sans-serif",
+          fontSize:'clamp(4rem, 10vw, 8rem)', fontWeight:900,
+          lineHeight:1, letterSpacing:'-0.04em', color:'#e6edf3',
+          marginBottom:'1.5rem',
+        }}>
+          Demo
+        </h1>
+
+        <p style={{fontSize:'1.5rem', color:'#8b949e', lineHeight:1.6}}>
+          Let's see{' '}<span style={{color:'#a371f7', fontWeight:600}}>StockAIgents</span>{' '}in action.
+        </p>
+
+      </div>
+    </div>
+  );
+}
+
+// ─── Slide 11: Deployment (section divider) ──────────────────────────────────
+function DeploymentSlide() {
+  return (
+    <div className="slide" style={{alignItems:'center', justifyContent:'center'}}>
+      <h1 style={{
+        fontFamily:"'Inter', sans-serif",
+        fontSize:'clamp(4rem, 10vw, 8rem)', fontWeight:900,
+        lineHeight:1, letterSpacing:'-0.04em', color:'#e6edf3',
+        textAlign:'center',
+      }}>
+        Deployment
+      </h1>
+    </div>
+  );
+}
+
+// ─── Slide 12: Thank You ──────────────────────────────────────────────────────
+function ThankYouSlide() {
+  return (
+    <div className="slide" style={{
+      alignItems:'center', justifyContent:'center',
+      background:'radial-gradient(ellipse 90% 60% at 50% 40%, rgba(110,64,201,0.3) 0%, transparent 70%), #0d1117',
+    }}>
+      <div style={{textAlign:'center', maxWidth:'820px'}}>
+
+        <h1 style={{
+          fontFamily:"'Inter', sans-serif",
+          fontSize:'clamp(3.5rem, 9vw, 7rem)', fontWeight:900,
+          lineHeight:1, letterSpacing:'-0.04em',
+          marginBottom:'1.75rem',
+          background:'linear-gradient(135deg, #e6edf3, #a371f7)',
+          WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text',
+        }}>
+          Thank you
+        </h1>
+
+        <p style={{fontSize:'1.6rem', color:'#8b949e', lineHeight:1.6, marginBottom:'3rem'}}>
+          Questions?
+        </p>
+
+        <div style={{width:'60px', height:'1px', background:'var(--border)', margin:'0 auto 2.5rem'}} />
+
+        <div style={{display:'flex', alignItems:'center', gap:'1rem', justifyContent:'center'}}>
+          <div style={{
+            width:'48px', height:'48px', borderRadius:'50%',
+            background:'rgba(163,113,247,0.15)', border:'1px solid rgba(163,113,247,0.3)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            fontSize:'1.2rem', fontWeight:700, color:'#a371f7', flexShrink:0,
+          }}>F</div>
+          <div style={{textAlign:'left'}}>
+            <p style={{fontSize:'1.15rem', fontWeight:600, color:'#e6edf3', margin:0}}>Faiz Ali</p>
+            <p style={{fontSize:'0.95rem', color:'#8b949e', margin:0}}>System Development Engineer · Amazon</p>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
+const SLIDES = [
+  { component: TitleSlide,        label: 'Intro'        },
+  { component: DisclaimerSlide,   label: 'Disclaimer'   },
+  { component: AudienceSlide,     label: 'Problem'      },
+  { component: AgentSlide,        label: 'AI Agent'     },
+  { component: MCPSlide,          label: 'MCP'          },
+  { component: AgentsSlide,       label: 'Our Agents'   },
+  { component: ArchitectureSlide, label: 'Architecture' },
+  { component: RequirementsSlide, label: 'Setup'        },
+  { component: StagesSlide,       label: 'Journey'      },
+  { component: DemoSlide,         label: 'Demo'         },
+  { component: DeploymentSlide,   label: 'Deployment'   },
+  { component: ThankYouSlide,     label: 'Thank You'    },
+];
+
+function App() {
+  const [current, setCurrent] = useState(0);
+  const goTo = (i) => setCurrent(Math.max(0, Math.min(i, SLIDES.length - 1)));
+
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown' || e.key === 'PageDown') goTo(current + 1);
+      if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp'   || e.key === 'PageUp')   goTo(current - 1);
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [current]);
+
+  return (
+    <div style={{width:'100vw', height:'100vh', position:'relative', overflow:'hidden', background:'#0d1117'}}>
+
+      {SLIDES.map(({ component: Slide }, i) => (
+        <div key={i} className={`slide-wrapper ${i === current ? 'active' : i < current ? 'left' : 'right'}`}>
+          <Slide isActive={i === current} />
+        </div>
+      ))}
+
+      {/* slide counter — top right */}
+      <div style={{position:'fixed', top:'1.75rem', right:'2rem', zIndex:100, color:'#6e7681', fontSize:'0.85rem', fontWeight:600, letterSpacing:'0.08em'}}>
+        <span style={{color:'#a371f7'}}>{String(current + 1).padStart(2,'0')}</span>
+        <span style={{margin:'0 0.3rem', color:'#30363d'}}>/</span>
+        {String(SLIDES.length).padStart(2,'0')}
+      </div>
+
+      {/* floating glass control bar */}
+      <div style={{
+        position:'fixed', bottom:'1.5rem', left:'50%', transform:'translateX(-50%)', zIndex:100,
+        display:'flex', alignItems:'center', gap:'0.5rem',
+        padding:'0.5rem 0.6rem',
+        background:'rgba(22,27,34,0.7)',
+        border:'1px solid rgba(255,255,255,0.08)',
+        borderRadius:'999px',
+        backdropFilter:'blur(16px)',
+        boxShadow:'0 8px 32px rgba(0,0,0,0.4)',
+      }}>
+        <button onClick={() => goTo(current - 1)} disabled={current === 0} style={{
+          width:'38px', height:'38px', borderRadius:'50%',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background:'transparent', border:'none',
+          color: current === 0 ? '#30363d' : '#c9d1d9',
+          cursor: current === 0 ? 'not-allowed' : 'pointer',
+          fontSize:'1.1rem', transition:'all 0.2s',
+        }}
+        onMouseEnter={e=>{ if(current!==0) e.currentTarget.style.background='rgba(255,255,255,0.08)'; }}
+        onMouseLeave={e=>{ e.currentTarget.style.background='transparent'; }}
+        >←</button>
+
+        <div style={{display:'flex', gap:'8px', alignItems:'center', padding:'0 0.5rem'}}>
+          {SLIDES.map((_, i) => (
+            <div key={i} onClick={() => goTo(i)}
+              style={{
+                height:'8px', borderRadius:'999px', cursor:'pointer',
+                transition:'all 0.3s cubic-bezier(0.22,1,0.36,1)',
+                width: i === current ? '28px' : '8px',
+                background: i === current ? '#a371f7' : '#30363d',
+              }} />
+          ))}
+        </div>
+
+        <button onClick={() => goTo(current + 1)} disabled={current === SLIDES.length - 1} style={{
+          width:'38px', height:'38px', borderRadius:'50%',
+          display:'flex', alignItems:'center', justifyContent:'center',
+          background: current === SLIDES.length - 1 ? 'transparent' : '#a371f7',
+          border:'none',
+          color: current === SLIDES.length - 1 ? '#30363d' : 'white',
+          cursor: current === SLIDES.length - 1 ? 'not-allowed' : 'pointer',
+          fontSize:'1.1rem', transition:'all 0.2s',
+          boxShadow: current === SLIDES.length - 1 ? 'none' : '0 2px 12px rgba(163,113,247,0.5)',
+        }}>→</button>
+      </div>
+
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+<div id="root"></div>
+</body>
+</html>

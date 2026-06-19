@@ -1,0 +1,41 @@
+{
+  "version": "1.0",
+  "created_at": "2026-06-15T05:29:15.958154Z",
+  "user_profile": {
+    "risk_profile": "aggressive",
+    "time_horizon": "medium_term",
+    "experience_level": "advanced"
+  },
+  "position_limits": {
+    "max_single_trade_pct": 5.0,
+    "max_single_stock_pct": 40.0,
+    "max_sector_pct": 60.0,
+    "min_cash_pct": 0.0
+  },
+  "allowed_asset_classes": [
+    "stocks",
+    "etfs"
+  ],
+  "blocked_asset_classes": [
+    "options",
+    "margin",
+    "crypto",
+    "futures"
+  ],
+  "allowed_order_types": [
+    "limit"
+  ],
+  "blocked_order_types": [
+    "market",
+    "stop_market",
+    "stop_limit"
+  ],
+  "approval": {
+    "human_approval_required": true,
+    "auto_execute_threshold_pct": 0.0
+  },
+  "behavioral_guards": {
+    "cooldown_after_loss_minutes": 1440,
+    "max_trades_per_day": 5
+  }
+}
