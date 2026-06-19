@@ -183,10 +183,10 @@ in plain English, and Claude figures out **how** to build it.
 **The brief is already written for you** — it's the `project-idea.md` file
 from the talk. Grab it and drop it into your project:
 
-1. Get `project-idea.md` (from the shared repo / the link given in the
-   talk).
-2. Copy it into your project folder so VS Code can see it.
-3. Open it and read through — this is your brief. It describes the product,
+1. Get [project-idea.md](https://github.com/mdfaizali390/stocksaigents/blob/main/project-idea.md)
+2. Get [ROBINHOOD_MCP_INTEGRATION.md](https://github.com/mdfaizali390/stocksaigents/blob/main/ROBINHOOD_MCP_INTEGRATION.md)
+3. Copy it into your project folder so VS Code can see it.
+4. Open it and read through — this is your brief. It describes the product,
    names the seven agents, lists the data sources, and states the safety
    principles. Crucially, it stays at the level of *what* to build and
    leaves the *how* to Claude.
