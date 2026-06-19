@@ -1,4 +1,4 @@
-# TradeDesk — AI Agents · Project Brief
+# StockAIgents · Project Brief
 
 > This is the brief I'm handing to Claude. It describes the product I want
 > and asks Claude to design how to build it.
