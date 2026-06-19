@@ -892,18 +892,73 @@ function DemoSlide() {
   );
 }
 
-// ─── Slide 11: Deployment (section divider) ──────────────────────────────────
-function DeploymentSlide() {
+// ─── Slide 11: Deployment ────────────────────────────────────────────────────
+function DeploymentSlide({ isActive }) {
+  const steps = [
+    { n:'01', icon:'🐙', label:'Push to GitHub', sub:'commit your code' },
+    { n:'02', icon:'⚙️', label:'Streamlit builds', sub:'auto-detects the change' },
+    { n:'03', icon:'🌐', label:'Live URL', sub:'shareable in ~2 min' },
+  ];
   return (
-    <div className="slide" style={{alignItems:'center', justifyContent:'center'}}>
-      <h1 style={{
-        fontFamily:"'Inter', sans-serif",
-        fontSize:'clamp(4rem, 10vw, 8rem)', fontWeight:900,
-        lineHeight:1, letterSpacing:'-0.04em', color:'#e6edf3',
-        textAlign:'center',
-      }}>
-        Deployment
-      </h1>
+    <div className="slide" style={{alignItems:'center', justifyContent:'center', padding:'48px 5vw 110px'}}>
+      <div style={{width:'100%', maxWidth:'1080px'}}>
+
+        {/* Header */}
+        <div style={{textAlign:'center', marginBottom:'2.5rem'}}>
+          <p style={{fontSize:'0.95rem', fontWeight:700, color:'#a371f7', letterSpacing:'0.18em', textTransform:'uppercase', marginBottom:'1rem'}}>
+            Deployment
+          </p>
+          <h2 style={{fontFamily:"'Inter', sans-serif", fontSize:'clamp(2.4rem, 5vw, 3.8rem)', fontWeight:800, lineHeight:1.1, letterSpacing:'-0.03em', color:'#e6edf3', marginBottom:'0.75rem'}}>
+            From laptop to live in{' '}<span style={{color:'#a371f7'}}>minutes</span>.
+          </h2>
+          <p style={{fontSize:'1.25rem', color:'#8b949e'}}>
+            Streamlit Community Cloud — free, no servers to manage.
+          </p>
+        </div>
+
+        {/* 3-step flow */}
+        <div key={isActive ? 'on' : 'off'} style={{display:'flex', alignItems:'stretch', justifyContent:'center', gap:'0.75rem', marginBottom:'2.5rem'}}>
+          {steps.map((s, i) => (
+            <React.Fragment key={s.n}>
+              <div className="arch-step" style={{
+                animationDelay:`${i * 0.18}s`,
+                flex:1, maxWidth:'280px',
+                padding:'1.6rem 1.5rem', borderRadius:'18px',
+                background:'rgba(22,27,34,0.85)', border:'1px solid #30363d',
+                textAlign:'center',
+              }}>
+                <div style={{fontSize:'2.4rem', lineHeight:1, marginBottom:'0.75rem'}}>{s.icon}</div>
+                <p style={{fontSize:'0.8rem', fontWeight:800, color:'#a371f7', letterSpacing:'0.05em', marginBottom:'0.35rem'}}>{s.n}</p>
+                <p style={{fontSize:'1.3rem', fontWeight:700, color:'#e6edf3', marginBottom:'0.3rem'}}>{s.label}</p>
+                <p style={{fontSize:'0.95rem', color:'#8b949e'}}>{s.sub}</p>
+              </div>
+              {i < steps.length - 1 && (
+                <div style={{display:'flex', alignItems:'center', color:'#a371f7', fontSize:'1.6rem'}}>→</div>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+
+        {/* Safety caveat — secondary */}
+        <div style={{
+          padding:'1.4rem 1.75rem', borderRadius:'16px',
+          background:'rgba(248,81,73,0.07)', border:'1px solid rgba(248,81,73,0.3)',
+          display:'flex', alignItems:'center', gap:'1.25rem',
+        }}>
+          <span style={{fontSize:'2rem', lineHeight:1, flexShrink:0}}>🔒</span>
+          <div>
+            <p style={{fontSize:'1.15rem', fontWeight:700, color:'#e6edf3', marginBottom:'0.25rem'}}>
+              One deliberate choice: Robinhood stays off in the cloud.
+            </p>
+            <p style={{fontSize:'1rem', color:'#8b949e', lineHeight:1.5}}>
+              Connecting it would put live brokerage tokens on a public server. So the
+              cloud app runs market, news &amp; trending fully — the full portfolio
+              experience stays{' '}<span style={{color:'#e6edf3', fontWeight:600}}>local, where your data never leaves your machine.</span>
+            </p>
+          </div>
+        </div>
+
+      </div>
     </div>
   );
 }

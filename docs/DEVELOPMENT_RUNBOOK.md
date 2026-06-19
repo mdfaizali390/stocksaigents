@@ -183,10 +183,10 @@ in plain English, and Claude figures out **how** to build it.
 **The brief is already written for you** — it's the `project-idea.md` file
 from the talk. Grab it and drop it into your project:
 
-1. Get [project-idea.md](https://github.com/mdfaizali390/stocksaigents/blob/main/project-idea.md)
-2. Get [ROBINHOOD_MCP_INTEGRATION.md](https://github.com/mdfaizali390/stocksaigents/blob/main/ROBINHOOD_MCP_INTEGRATION.md)
-3. Copy it into your project folder so VS Code can see it.
-4. Open it and read through — this is your brief. It describes the product,
+1. Get `project-idea.md` (from the shared repo / the link given in the
+   talk).
+2. Copy it into your project folder so VS Code can see it.
+3. Open it and read through — this is your brief. It describes the product,
    names the seven agents, lists the data sources, and states the safety
    principles. Crucially, it stays at the level of *what* to build and
    leaves the *how* to Claude.
@@ -349,42 +349,137 @@ Time to see it work.
 So you can use it from anywhere (or show friends). We'll use **Streamlit
 Community Cloud** — free.
 
+> ### ⚠️ Read this first: we deploy with Robinhood **disabled** on purpose
+>
+> Robinhood's login is a one-time **browser** flow — it physically cannot
+> run on a headless cloud server. The only way to connect Robinhood on the
+> cloud is to **copy your live brokerage tokens onto Streamlit's servers**,
+> behind a public URL. Those tokens give **read access to your real
+> portfolio**.
+>
+> **So the default, recommended deployment turns Robinhood off.** The app
+> detects there are no Robinhood tokens and runs in a graceful
+> "portfolio not connected" mode:
+>
+> - ✅ **Works fully:** market questions, trending stocks, company news,
+>   technical analysis (Finnhub / Stocktwits / yfinance — no login needed).
+> - 🔌 **Degrades cleanly:** "How many AAPL do I have?" / trade-specific
+>   risk → a friendly "brokerage isn't connected here" message, never a
+>   crash or a wrong answer.
+>
+> For the full portfolio experience, **run the app locally** (steps 10–11),
+> where the browser login works and your tokens never leave your machine.
+>
+> If you still want Robinhood live on the cloud, see §12.4 — **at your own
+> risk.**
+
 ### 12.1 Put your code on GitHub
 
-1. Create a **private** repo at **https://github.com/new**
-2. In VS Code, use the **Source Control** panel (or ask Claude) to commit
-   and push your project to that repo.
+1. Create a **private** repo at **https://github.com/new** (private matters —
+   you'll point it at your real accounts).
+2. Push your project to that repo (VS Code Source Control, GitHub Desktop,
+   or the GitHub web upload — whatever you used).
 
-> Double-check `.env` and `.cache/` are **not** in the repo — they should
-> be gitignored. Never push secrets.
+> Double-check `.env` and `.cache/` are **not** in the repo — they're
+> gitignored. **Never push secrets.** Confirm by browsing the repo on
+> github.com: you should NOT see `.env` or a `.cache` folder.
 
-### 12.2 Deploy
+### 12.2 Deploy (Robinhood disabled — recommended)
 
 1. Go to **https://share.streamlit.io**
-2. Sign in with GitHub
-3. Click **New app**, pick your repo, branch `main`, and set the main file
-   to `src/ui/streamlit_app.py`
-4. Under **Advanced settings → Secrets**, paste your keys (same values as
-   your `.env`):
+2. Sign in with GitHub (authorize access to your repo, including private).
+3. Click **Create app** → deploy from your repo.
+4. Set:
+   - **Repository:** `your-username/your-repo`
+   - **Branch:** `main`
+   - **Main file path:** `src/ui/streamlit_app.py`
+5. Open **Advanced settings → Secrets** and paste **only these two keys**
+   (TOML format) — no Robinhood section:
+   ```toml
+   ANTHROPIC_API_KEY = "sk-ant-...your key..."
+   FINNHUB_API_KEY = "...your finnhub key..."
    ```
-   ANTHROPIC_API_KEY="sk-ant-..."
-   FINNHUB_API_KEY="..."
-   ```
-5. Click **Deploy**
+6. Click **Deploy**.
 
-### 12.3 The Robinhood-on-cloud caveat
+After ~2 minutes you'll get a public URL like `your-app.streamlit.app`.
+The sidebar will show a **"🔌 Portfolio not connected"** banner — that
+confirms it's running in the safe, Robinhood-disabled mode.
 
-Robinhood's browser login can't run on a cloud server. For a personal
-demo, the simplest path is to **copy your local token files into the
-deployment's secrets** (the `.cache/robinhood_oauth/` contents). Ask Claude
-to walk you through wiring a `SecretsTokenStorage` — it's a small change.
+### 12.3 Lock the app down
 
-> For just showing the app working, you can also deploy with Robinhood
-> disabled and demo the agents that use Finnhub / Stocktwits / yfinance
-> only. Decide based on your audience.
+Even without Robinhood, the app spends **your** Anthropic credit on every
+query — so don't leave it open to the world:
 
-After ~2 minutes you'll get a public URL like
-`your-app.streamlit.app`. Done.
+1. In the app → **⋮ menu → Settings → Sharing**
+2. Set it to **"Only specific people"** and add your own email (plus anyone
+   you trust).
+
+> Streamlit's free tier limits private apps to a small number of viewers —
+> fine for you + a couple of people. That's the baseline protection;
+> there's no login wall otherwise.
+
+### 12.4 (Advanced — at your own risk) Deploy WITH Robinhood live
+
+> **This puts live brokerage tokens with read access to your real portfolio
+> onto Streamlit's servers, reachable at a public URL. Only do this if you
+> understand and accept that.** Mitigations: keep the app **private**
+> (§12.3), keep your Agentic account's balance small, and **rotate the
+> tokens after** (revoke the app in Robinhood → Account → connected/agentic
+> apps, then re-auth locally).
+
+The app already supports this — it reads tokens from Streamlit secrets and
+runs Robinhood in **headless** mode (no browser attempt). You just supply
+the tokens.
+
+**Step 1 — Authenticate locally first.** You need valid tokens to copy.
+Run the app locally and connect Robinhood once (steps 10–11). This creates:
+- `.cache/robinhood_oauth/client_info.json`
+- `.cache/robinhood_oauth/tokens.json`
+
+**Step 2 — Print the two files** so you can copy their contents:
+```bash
+cat .cache/robinhood_oauth/client_info.json
+cat .cache/robinhood_oauth/tokens.json
+```
+
+**Step 3 — Add them to Streamlit secrets.** In the app →
+**⋮ → Settings → Secrets**, use this exact structure. The `'''`
+triple-quotes let each JSON blob span multiple lines:
+```toml
+ANTHROPIC_API_KEY = "sk-ant-...your key..."
+FINNHUB_API_KEY = "...your finnhub key..."
+
+[robinhood]
+client_info = '''
+{ ...paste the entire contents of client_info.json here... }
+'''
+tokens = '''
+{ ...paste the entire contents of tokens.json here... }
+'''
+```
+
+**Step 4 — Save.** Streamlit reboots. With a `[robinhood]` section present,
+the app switches to **headless** mode and uses those tokens — the sidebar
+banner disappears and portfolio questions work on the cloud.
+
+**Token expiry.** Robinhood access tokens last ~9 days, and refreshes are
+**not** persisted on the cloud (the disk is wiped on every reboot). When
+the token expires the app shows a "re-authenticate locally and update the
+tokens" message — at that point, re-run the local connect, re-copy
+`tokens.json`, and paste it into secrets again.
+
+**Force-disable switch.** If you've pasted tokens but want to temporarily
+turn Robinhood off (e.g. for a public demo), add this to secrets:
+```toml
+DISABLE_ROBINHOOD = "1"
+```
+
+### 12.5 Redeploying after changes
+
+Streamlit Cloud **auto-redeploys** — there's no deploy button to re-click.
+Push a new commit to the watched branch (`main`) and it rebuilds within a
+minute. To force it (e.g. after only changing secrets): app →
+**⋮ → Reboot app**.
 
 ---
 
@@ -396,8 +491,11 @@ After ~2 minutes you'll get a public URL like
 | `ANTHROPIC_API_KEY is required` | Your `.env` is missing the key or has a typo. Check for stray spaces. |
 | Finnhub `429 Too Many Requests` | You hit the 60-calls/min free limit. Wait a minute; the app caches and throttles, so it recovers on its own. |
 | Robinhood browser login didn't return | The script prints a URL — paste it manually. If tokens expired, delete `.cache/robinhood_oauth/` and reconnect. |
-| Streamlit `ModuleNotFoundError: src` | Run via `./scripts/run_ui.sh` (it sets the path correctly), not `streamlit run` directly. |
+| Streamlit `ModuleNotFoundError: src` | Run via `./scripts/run_ui.sh` (it sets the path correctly), not `streamlit run` directly. On the cloud, the app adds the repo root to `sys.path` itself. |
 | First query takes ~60s | Normal — cold cache. Subsequent queries are fast. |
+| `401 invalid x-api-key` | Your Anthropic key is wrong, revoked, or has a **space after the `=`** in `.env`. Also check you don't have a stale `ANTHROPIC_API_KEY` exported in your shell (`echo $ANTHROPIC_API_KEY`) — a shell export overrides `.env`. Fully restart the app after fixing. |
+| Cloud: keys ignored / "required" error | Streamlit Cloud puts secrets in `st.secrets`, not env vars. The app bridges them automatically — make sure the secret names match exactly (`ANTHROPIC_API_KEY`, `FINNHUB_API_KEY`). |
+| Cloud: `OSError: Address already in use` / OAuth crash | Robinhood tried its browser flow on the cloud (no tokens supplied). Either deploy disabled (§12.2) or supply tokens (§12.4). |
 | Claude wants to run a command I don't understand | Ask it: *"what does this command do and is it safe?"* before approving. |
 
 ---
